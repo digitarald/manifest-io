@@ -10,6 +10,7 @@ var exec = require('child_process').exec;
 var ejs = require('ejs');
 var async = require('async');
 var request = require('request');
+var im = require('imagemagick');
 
 
 var queue = {};
@@ -53,7 +54,7 @@ App.prototype.prepare = function(callback) {
 	// Download manifest
 	request(this.manifestUrl, function (error, response, body) {
 
-    if (error || response.statusCode != 200) {
+		if (error || response.statusCode != 200) {
 			callback(new Error('Unexpected status-code ' + response.statusCode));
 			return;
 		}
@@ -134,7 +135,7 @@ App.prototype.getIconUrl = function(target) {
 	return icon;
 };
 
-App.prototype.getBuild = function(callback) {
+App.prototype.getBuild = function(callback, refresh, debug) {
 
 	var app = this;
 
@@ -149,7 +150,14 @@ App.prototype.getBuild = function(callback) {
 
 	this.setupBuild(function(err) {
 
-		var cmd = util.format('cd %s && ant release', app.path);
+		debug = !!debug;
+
+		var target = 'release';
+		if (debug) {
+			target = 'debug';
+		}
+
+		var cmd = util.format('cd %s && ant %s', app.path, target);
 
 		exec(cmd, function(err, stdout, stderr) {
 				console.log('Build app', stdout, stderr);
@@ -159,7 +167,8 @@ App.prototype.getBuild = function(callback) {
 					return;
 				}
 
-				var file = path.join(app.path, 'bin', app.packageName + '-release.apk');
+				var file = path.join(app.path, 'bin',
+					app.packageName + '-' + target + '.apk');
 
 				console.log('Build served via ' + file);
 
@@ -167,11 +176,11 @@ App.prototype.getBuild = function(callback) {
 
 		});
 
-	});
+	}, refresh);
 
 };
 
-App.prototype.setupBuild = function(callback) {
+App.prototype.setupBuild = function(callback, refresh) {
 
 	var exists = path.existsSync(path.join(this.path, 'ant.properties'));
 
@@ -179,7 +188,7 @@ App.prototype.setupBuild = function(callback) {
 
 	console.log('Checking config', this.path, exists);
 
-	if (exists) {
+	if (exists && !Boolean(refresh)) {
 		callback();
 		return;
 	}
@@ -210,13 +219,13 @@ App.prototype.setupBuild = function(callback) {
 	// Copy template folder to app path
 
 	var templatePath = path.join(__dirname, '../template');
-	var packagePath = path.join(this.path, 'src/org/mozilla/labs/soup',
-		app.packageName);
+	var packagePath = path.join(this.path, 'src/org/mozilla/labs/soup', app.packageName);
 
-	exec(util.format('cp -r %s %s', templatePath, this.path),
-		function(err, stdout, stderr) {
+	var cmd = util.format('rm -rf %s && cp -R %s %s', this.path, templatePath, this.path);
 
-		console.log('Created app folder', {stdout: stdout, stderr: stderr});
+	exec(cmd, function(err, stdout, stderr) {
+
+		console.log('Created app folder', stdout, stderr);
 
 		if (err) {
 			callback(err);
@@ -308,16 +317,39 @@ App.prototype.setupBuild = function(callback) {
 							return;
 						}
 
-						var file = path.join(app.path, 'res/drawable-' + density,
-							'ic_launcher.png');
+						var file = path.join(app.path, 'res/drawable-' + density, 'ic_launcher.png');
 
 						console.log('Loading ' + icon + ' to ' + file);
 
 						var stream = fs.createWriteStream(file);
-						stream.on('close', callbackP);
-						stream.on('error', callbackP);
 
-						request(icon).pipe(stream);
+						stream.on('close', function() {
+
+							im.resize({
+								srcPath: file,
+								dstPath: file,
+								format: 'png',
+								width: size,
+								height: size
+							}, function(err, stdout, stderr){
+
+								if (err) {
+									console.error(stdout, stderr);
+								}
+								callbackP();
+
+							});
+
+						});
+						stream.on('error', function() {
+							callbackP();
+						});
+
+						request(icon, function(err) {
+							if (err) {
+								callbackP();
+							}
+						}).pipe(stream);
 
 						/*
 						request(icon, function(err, response, body) {
@@ -410,7 +442,7 @@ function build(req, res, next) {
 
 			res.contentType('application/vnd.android.package-archive');
 			res.download(file, app.packageName + '.apk');
-		});
+		}, req.query.refresh || false, req.query.debug || false);
 	});
 
 };

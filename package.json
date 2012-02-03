@@ -10,6 +10,7 @@
     , "utile": ">= 0.0.10"
     , "async": ">= 0.1.15"
     , "request": ">= 2.9.100"
+    , "imagemagick": ">= 0.1.2"
    }
   , "scripts": {
     "start": "./server/start.js"
