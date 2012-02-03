@@ -9,7 +9,7 @@
     , "winston": ">= 0.5.9"
     , "utile": ">= 0.0.10"
     , "async": ">= 0.1.15"
-    , "request" ">= 2.9.100"
+    , "request": ">= 2.9.100"
    }
   , "scripts": {
     "start": "./server/start.js"
