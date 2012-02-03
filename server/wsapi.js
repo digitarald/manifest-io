@@ -449,7 +449,7 @@ function build(req, res, next) {
 
 function share(req, res, next) {
 
-	var url = encodeURIComponent(req.params[0]);
+	var url = req.params[0];
 	var full = encodeURIComponent('http://' + req.headers.host + '/build/' + url);
 
 	console.log('Share', full);
