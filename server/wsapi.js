@@ -423,7 +423,7 @@ function share(req, res, next) {
 	console.log('Share', full);
 
 	request.
-		get('http://chart.apis.google.com/chart?cht=qr&chs=500x500&chl=' + url).
+		get('http://chart.apis.google.com/chart?cht=qr&chs=500x500&chl=' + full).
 		pipe(res);
 }
 
